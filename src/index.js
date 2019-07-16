@@ -20,7 +20,7 @@ Papa.parsePromise = function(file) {
 
 const prepareData = async () => {
   const csv = await Papa.parsePromise(
-    "https://raw.githubusercontent.com/curiousily/Credit-Default-prediction-with-TensorFlow-js/master/src/data/UCI_Credit_Card.csv"
+    "https://raw.githubusercontent.com/curiousily/Customer-Churn-Detection-with-TensorFlow-js/master/src/data/customer-churn.csv"
   );
 
   const data = csv.data;
@@ -188,21 +188,33 @@ const oneHot = (val, categoryCount) =>
   Array.from(tf.oneHot(val, categoryCount).dataSync());
 
 const toTensors = (data, categoricalFeatures) => {
-  const features = Object.keys(data[0]).filter(
-    f => f !== "default.payment.next.month" && f !== "ID"
-  );
-  const X = data.map(r =>
+  // const features = Object.keys(data[0]).filter(
+  //   f => f !== "default.payment.next.month" && f !== "ID"
+  // );
+
+  const categoricalData = {};
+  categoricalFeatures.forEach(f => {
+    categoricalData[f] = toCategorical(data, f);
+  });
+
+  const features = [
+    "SeniorCitizen",
+    "tenure",
+    "MonthlyCharges",
+    "TotalCharges"
+  ].concat(Array.from(categoricalFeatures));
+
+  const X = data.map((r, i) =>
     features.flatMap(f => {
       if (categoricalFeatures.has(f)) {
-        return oneHot(r[f], VARIABLE_CATEGORY_COUNT[f]);
+        return categoricalData[f][i];
       }
+
       return r[f];
     })
   );
 
-  const y = tf.tensor(
-    data.map(r => oneHot(r["default.payment.next.month"], 2))
-  );
+  const y = tf.tensor(toCategorical(data, "Churn"));
 
   return [normalize(tf.tensor2d(X)), y];
 };
@@ -211,7 +223,7 @@ const trainModel = async (xTrain, yTrain) => {
   const model = tf.sequential();
   model.add(
     tf.layers.dense({
-      units: 4,
+      units: 32,
       activation: "relu",
       inputShape: [xTrain.shape[1]]
     })
@@ -219,12 +231,10 @@ const trainModel = async (xTrain, yTrain) => {
 
   model.add(
     tf.layers.dense({
-      units: 8,
+      units: 64,
       activation: "relu"
     })
   );
-
-  model.add(tf.layers.dropout({ rate: 0.2 }));
 
   model.add(tf.layers.dense({ units: 2, activation: "softmax" }));
 
@@ -239,25 +249,57 @@ const trainModel = async (xTrain, yTrain) => {
   const accContainer = document.getElementById("acc-cont");
 
   await model.fit(xTrain, yTrain, {
-    batchSize: 256,
-    epochs: 100,
+    batchSize: 32,
+    epochs: 30,
     shuffle: true,
     validationSplit: 0.1,
-    callbacks: {
-      onEpochEnd: async (epoch, logs) => {
-        // console.log(logs);
-        trainLogs.push(logs);
-        tfvis.show.history(lossContainer, trainLogs, ["loss", "val_loss"]);
-        tfvis.show.history(accContainer, trainLogs, ["acc", "val_acc"]);
+    callbacks: tfvis.show.fitCallbacks(
+      lossContainer,
+      ["loss", "val_loss", "acc", "val_acc"],
+      {
+        callbacks: ["onEpochEnd"]
       }
-    }
+    )
+
+    // callbacks: {
+    //   onEpochEnd: async (epoch, logs) => {
+    //     // console.log(logs);
+    //     trainLogs.push(logs);
+    //     tfvis.show.history(lossContainer, trainLogs, ["loss", "val_loss"]);
+    //     tfvis.show.history(accContainer, trainLogs, ["acc", "val_acc"]);
+    //   }
+    // }
   });
 
   return model;
 };
 
+const toCategorical = (data, column) => {
+  const values = data.map(r => r[column]);
+  const uniqueValues = new Set(values);
+
+  const mapping = {};
+
+  Array.from(uniqueValues).forEach((i, v) => {
+    mapping[i] = v;
+  });
+
+  const encoded = values
+    .map(v => {
+      if (!v) {
+        return 0;
+      }
+      return mapping[v];
+    })
+    .map(v => oneHot(v, uniqueValues.size));
+
+  return encoded;
+};
+
 const run = async () => {
   const data = await prepareData();
+  // toCategorical(data, "Churn");
+  // console.log(data[data.length - 1]);
 
   // renderDefaults(data);
   // renderHistogram("limit-cont", data, "LIMIT_BAL", {
@@ -275,9 +317,23 @@ const run = async () => {
   //   xLabel: "Status"
   // });
 
-  const [xTrain, yTrain] = toTensors(data, new Set(["MARRIAGE", "SEX"]));
-  // console.log(xTrain.shape);
-  // const [xTest, yTest] = toTensors(testData, new Set(["left_handed_batter"]));
+  const [xTrain, yTrain] = toTensors(
+    data,
+    new Set([
+      "TechSupport",
+      "Contract",
+      "PaymentMethod",
+      "gender",
+      "Partner",
+      "InternetService",
+      "Dependents",
+      "PhoneService",
+      "TechSupport",
+      "StreamingTV",
+      "PaperlessBilling"
+    ])
+  );
+
   const model = await trainModel(xTrain, yTrain);
   // const preds = model.predict(xTest).argMax(-1);
   // const labels = yTest.argMax(-1);
