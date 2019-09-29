@@ -28,15 +28,11 @@ const prepareData = async () => {
 };
 
 const renderHistogram = (container, data, column, config) => {
-  const defaulted = data
-    .filter(r => r["default.payment.next.month"] === 1)
-    .map(r => r[column]);
-  const paid = data
-    .filter(r => r["default.payment.next.month"] === 0)
-    .map(r => r[column]);
+  const defaulted = data.filter(r => r["Churn"] === "Yes").map(r => r[column]);
+  const paid = data.filter(r => r["Churn"] === "No").map(r => r[column]);
 
   const dTrace = {
-    name: "Defaulted",
+    name: "Churned",
     x: defaulted,
     type: "histogram",
     opacity: 0.35,
@@ -46,7 +42,7 @@ const renderHistogram = (container, data, column, config) => {
   };
 
   const hTrace = {
-    name: "Paid",
+    name: "Retained",
     x: paid,
     type: "histogram",
     opacity: 0.35,
@@ -65,15 +61,15 @@ const renderHistogram = (container, data, column, config) => {
   });
 };
 
-const renderDefaults = data => {
-  const paymentStatus = data.map(r => r["default.payment.next.month"]);
+const renderChurn = data => {
+  const churns = data.map(r => r["Churn"]);
 
-  const [defaulted, paid] = _.partition(paymentStatus, o => o === 1);
+  const [churned, retained] = _.partition(churns, o => o === "Yes");
 
   const chartData = [
     {
-      labels: ["Defaulted", "Paid"],
-      values: [defaulted.length, paid.length],
+      labels: ["Churned", "Retained"],
+      values: [churned.length, retained.length],
       type: "pie",
       opacity: 0.6,
       marker: {
@@ -82,22 +78,22 @@ const renderDefaults = data => {
     }
   ];
 
-  Plotly.newPlot("defaults-cont", chartData, {
-    title: "Defaulted vs Paid payment"
+  Plotly.newPlot("churn-cont", chartData, {
+    title: "Churned vs Retained payment"
   });
 };
 
-const renderSexDefault = data => {
-  const defaulted = data.filter(r => r["default.payment.next.month"] === 1);
-  const paied = data.filter(r => r["default.payment.next.month"] === 0);
+const renderSexChurn = data => {
+  const churned = data.filter(r => r["Churn"] === "Yes");
+  const retained = data.filter(r => r["Churn"] === "No");
 
-  const [dMale, dFemale] = _.partition(defaulted, s => s.SEX === 1);
-  const [pMale, pFemale] = _.partition(paied, b => b.SEX === 1);
+  const [dMale, dFemale] = _.partition(churned, s => s.gender === "Male");
+  const [pMale, pFemale] = _.partition(retained, b => b.gender === "Male");
 
   var sTrace = {
     x: ["Male", "Female"],
     y: [dMale.length, dFemale.length],
-    name: "Defaulted",
+    name: "Churned",
     type: "bar",
     opacity: 0.6,
     marker: {
@@ -108,7 +104,7 @@ const renderSexDefault = data => {
   var bTrace = {
     x: ["Male", "Female"],
     y: [pMale.length, pFemale.length],
-    name: "Paid",
+    name: "Retained",
     type: "bar",
     opacity: 0.6,
     marker: {
@@ -116,30 +112,23 @@ const renderSexDefault = data => {
     }
   };
 
-  Plotly.newPlot("sex-default-cont", [sTrace, bTrace], {
+  Plotly.newPlot("sex-churn-cont", [sTrace, bTrace], {
     barmode: "group",
-    title: "Sex vs Default Status"
+    title: "Sex vs Churn Status"
   });
 };
 
-const renderEducationDefault = data => {
-  const defaulted = data.filter(r => r["default.payment.next.month"] === 1);
-  const paied = data.filter(r => r["default.payment.next.month"] === 0);
+const renderSeniorChurn = data => {
+  const churned = data.filter(r => r["Churn"] === "Yes");
+  const retained = data.filter(r => r["Churn"] === "No");
 
-  const defaultedGroups = _.groupBy(defaulted, "EDUCATION");
-  const paidGroups = _.groupBy(paied, "EDUCATION");
+  const [dMale, dFemale] = _.partition(churned, s => s.SeniorCitizen === 1);
+  const [pMale, pFemale] = _.partition(retained, b => b.SeniorCitizen === 1);
 
   var sTrace = {
-    x: ["Graduate school", "University", "High school", "Other"],
-    y: [
-      defaultedGroups[1].length,
-      defaultedGroups[2].length,
-      defaultedGroups[3].length,
-      defaultedGroups[4].length +
-        defaultedGroups[5].length +
-        defaultedGroups[6].length
-    ],
-    name: "Defaulted",
+    x: ["Senior", "Non senior"],
+    y: [dMale.length, dFemale.length],
+    name: "Churned",
     type: "bar",
     opacity: 0.6,
     marker: {
@@ -148,17 +137,9 @@ const renderEducationDefault = data => {
   };
 
   var bTrace = {
-    x: ["Graduate school", "University", "High school", "Other"],
-    y: [
-      paidGroups[1].length,
-      paidGroups[2].length,
-      paidGroups[3].length,
-      paidGroups[0].length +
-        paidGroups[4].length +
-        paidGroups[5].length +
-        paidGroups[6].length
-    ],
-    name: "Paid",
+    x: ["Senior", "Non senior"],
+    y: [pMale.length, pFemale.length],
+    name: "Retained",
     type: "bar",
     opacity: 0.6,
     marker: {
@@ -166,15 +147,10 @@ const renderEducationDefault = data => {
     }
   };
 
-  Plotly.newPlot("edu-default-cont", [sTrace, bTrace], {
+  Plotly.newPlot("senior-churn-cont", [sTrace, bTrace], {
     barmode: "group",
-    title: "Education vs Default Status"
+    title: "Senior vs Churn Status"
   });
-};
-
-const VARIABLE_CATEGORY_COUNT = {
-  MARRIAGE: 4,
-  SEX: 2
 };
 
 // normalized = (value − min_value) / (max_value − min_value)
@@ -187,11 +163,29 @@ const normalize = tensor =>
 const oneHot = (val, categoryCount) =>
   Array.from(tf.oneHot(val, categoryCount).dataSync());
 
-const toTensors = (data, categoricalFeatures) => {
-  // const features = Object.keys(data[0]).filter(
-  //   f => f !== "default.payment.next.month" && f !== "ID"
-  // );
+const toCategorical = (data, column) => {
+  const values = data.map(r => r[column]);
+  const uniqueValues = new Set(values);
 
+  const mapping = {};
+
+  Array.from(uniqueValues).forEach((i, v) => {
+    mapping[i] = v;
+  });
+
+  const encoded = values
+    .map(v => {
+      if (!v) {
+        return 0;
+      }
+      return mapping[v];
+    })
+    .map(v => oneHot(v, uniqueValues.size));
+
+  return encoded;
+};
+
+const toTensors = (data, categoricalFeatures, testSize) => {
   const categoricalData = {};
   categoricalFeatures.forEach(f => {
     categoricalData[f] = toCategorical(data, f);
@@ -214,9 +208,16 @@ const toTensors = (data, categoricalFeatures) => {
     })
   );
 
+  const X_t = normalize(tf.tensor2d(X));
+
   const y = tf.tensor(toCategorical(data, "Churn"));
 
-  return [normalize(tf.tensor2d(X)), y];
+  const splitIdx = parseInt((1 - testSize) * data.length, 10);
+
+  const [xTrain, xTest] = tf.split(X_t, [splitIdx, data.length - splitIdx]);
+  const [yTrain, yTest] = tf.split(y, [splitIdx, data.length - splitIdx]);
+
+  return [xTrain, xTest, yTrain, yTest];
 };
 
 const trainModel = async (xTrain, yTrain) => {
@@ -244,13 +245,11 @@ const trainModel = async (xTrain, yTrain) => {
     metrics: ["accuracy"]
   });
 
-  const trainLogs = [];
   const lossContainer = document.getElementById("loss-cont");
-  const accContainer = document.getElementById("acc-cont");
 
   await model.fit(xTrain, yTrain, {
     batchSize: 32,
-    epochs: 30,
+    epochs: 100,
     shuffle: true,
     validationSplit: 0.1,
     callbacks: tfvis.show.fitCallbacks(
@@ -260,89 +259,69 @@ const trainModel = async (xTrain, yTrain) => {
         callbacks: ["onEpochEnd"]
       }
     )
-
-    // callbacks: {
-    //   onEpochEnd: async (epoch, logs) => {
-    //     // console.log(logs);
-    //     trainLogs.push(logs);
-    //     tfvis.show.history(lossContainer, trainLogs, ["loss", "val_loss"]);
-    //     tfvis.show.history(accContainer, trainLogs, ["acc", "val_acc"]);
-    //   }
-    // }
   });
 
   return model;
 };
 
-const toCategorical = (data, column) => {
-  const values = data.map(r => r[column]);
-  const uniqueValues = new Set(values);
-
-  const mapping = {};
-
-  Array.from(uniqueValues).forEach((i, v) => {
-    mapping[i] = v;
-  });
-
-  const encoded = values
-    .map(v => {
-      if (!v) {
-        return 0;
-      }
-      return mapping[v];
-    })
-    .map(v => oneHot(v, uniqueValues.size));
-
-  return encoded;
-};
-
 const run = async () => {
   const data = await prepareData();
-  // toCategorical(data, "Churn");
-  // console.log(data[data.length - 1]);
 
-  // renderDefaults(data);
-  // renderHistogram("limit-cont", data, "LIMIT_BAL", {
-  //   title: "Amount of given credit",
-  //   xLabel: "Limit"
-  // });
-  // renderHistogram("age-default-cont", data, "AGE", {
-  //   title: "Age vs Payment Status",
-  //   xLabel: "Age (years)"
-  // });
-  // renderSexDefault(data);
-  // renderEducationDefault(data);
-  // renderHistogram("repayment-cont", data, "PAY_0", {
-  //   title: "Repayment status (September 2005)",
-  //   xLabel: "Status"
-  // });
+  renderChurn(data);
+  renderSexChurn(data);
+  renderSeniorChurn(data);
 
-  const [xTrain, yTrain] = toTensors(
+  renderHistogram("tenure-cont", data, "tenure", {
+    title: "Tenure duration",
+    xLabel: "Tenure (months)"
+  });
+
+  renderHistogram("monthly-charges-cont", data, "MonthlyCharges", {
+    title: "Amount charged monthly",
+    xLabel: "Amount (USD)"
+  });
+
+  renderHistogram("total-charges-cont", data, "TotalCharges", {
+    title: "Total amount charged",
+    xLabel: "Amount (USD)"
+  });
+
+  const categoricalFeatures = new Set([
+    "TechSupport",
+    "Contract",
+    "PaymentMethod",
+    "gender",
+    "Partner",
+    "InternetService",
+    "Dependents",
+    "PhoneService",
+    "TechSupport",
+    "StreamingTV",
+    "PaperlessBilling"
+  ]);
+
+  const [xTrain, xTest, yTrain, yTest] = toTensors(
     data,
-    new Set([
-      "TechSupport",
-      "Contract",
-      "PaymentMethod",
-      "gender",
-      "Partner",
-      "InternetService",
-      "Dependents",
-      "PhoneService",
-      "TechSupport",
-      "StreamingTV",
-      "PaperlessBilling"
-    ])
+    categoricalFeatures,
+    0.1
   );
 
   const model = await trainModel(xTrain, yTrain);
-  // const preds = model.predict(xTest).argMax(-1);
-  // const labels = yTest.argMax(-1);
-  // const confusionMatrix = await tfvis.metrics.confusionMatrix(labels, preds);
-  // const container = document.getElementById("confusion-matrix");
-  // tfvis.render.confusionMatrix(container, {
-  //   values: confusionMatrix,
-  //   tickLabels: ["Strike", "Ball"]
-  // });
+
+  const result = model.evaluate(xTest, yTest, {
+    batchSize: 32
+  });
+  result[0].print();
+  result[1].print();
+
+  const preds = model.predict(xTest).argMax(-1);
+  const labels = yTest.argMax(-1);
+  const confusionMatrix = await tfvis.metrics.confusionMatrix(labels, preds);
+  const container = document.getElementById("confusion-matrix");
+  tfvis.render.confusionMatrix(container, {
+    values: confusionMatrix,
+    tickLabels: ["Retained", "Churned"]
+  });
 };
 
 if (document.readyState !== "loading") {
