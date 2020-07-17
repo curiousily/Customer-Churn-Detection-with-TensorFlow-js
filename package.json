@@ -10,7 +10,7 @@
   "dependencies": {
     "@tensorflow/tfjs": "1.2.3",
     "@tensorflow/tfjs-vis": "1.1.0",
-    "lodash": "4.17.14",
+    "lodash": "4.17.19",
     "papaparse": "5.0.0",
     "plotly.js-dist": "1.48.3"
   },
