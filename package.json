@@ -11,7 +11,7 @@
     "@tensorflow/tfjs": "1.2.3",
     "@tensorflow/tfjs-vis": "1.1.0",
     "lodash": "4.17.14",
-    "papaparse": "5.0.0",
+    "papaparse": "5.3.0",
     "plotly.js-dist": "1.48.3"
   },
   "devDependencies": {
